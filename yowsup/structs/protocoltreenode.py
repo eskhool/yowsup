@@ -1,12 +1,20 @@
 import binascii
-import sys
+
+
 class ProtocolTreeNode(object):
+    _STR_MAX_LEN_DATA = 500
+    _STR_INDENT = '  '
+
     def __init__(self, tag, attributes = None, children = None, data = None):
+        # type: (str, dict, list[ProtocolTreeNode], bytes) -> None
+        if data is not None:
+            assert type(data) is bytes, type(data)
 
         self.tag = tag
         self.attributes = attributes or {}
         self.children = children or []
         self.data = data
+        self._truncate_str_data = True
 
         assert type(self.children) is list, "Children must be a list, got %s" % type(self.children)
 
@@ -46,57 +54,52 @@ class ProtocolTreeNode(object):
     def __hash__(self):
         return hash(self.tag) ^ hash(tuple(self.attributes.items())) ^ hash(self.data)
 
-    def toString(self):
-        out = "<"+self.tag
-        if self.attributes is not None:
-            for key,val in self.attributes.items():
-                out+= " "+key+'="'+val+'"'
-        out+= ">\n"
-
-        if self.data is not None:
-            if type(self.data) is bytearray:
-                try:
-                    out += "%s" % self.data.decode()
-                except UnicodeDecodeError:
-                    out += binascii.hexlify(self.data)
-            else:
-                out += "%s" % self.data
-
-
-            if type(self.data) is str and sys.version_info >= (3,0):
-                out += "\nHEX3:%s\n" % binascii.hexlify(self.data.encode('latin-1'))
-            else:
-                out += "\nHEX:%s\n" % binascii.hexlify(self.data)
-        
-        for c in self.children:
-            try:
-                out += c.toString()
-            except UnicodeDecodeError:
-                out += "[ENCODED DATA]\n"
-        out+= "</"+self.tag+">\n"
-        return out
-
-    
     def __str__(self):
-        return self.toString() 
+        out = "<%s" % self.tag
+        attrs = " ".join((map(lambda item: "%s=\"%s\"" % item, self.attributes.items())))
+        children = "\n".join(map(str, self.children))
+        data = self.data or b""
+        len_data = len(data)
+
+        if attrs:
+            out = "%s %s" % (out, attrs)
+
+        if children or data:
+            out = "%s>" % out
+            if children:
+                out = "%s\n%s%s" % (out, self._STR_INDENT, children.replace('\n', '\n' + self._STR_INDENT))
+            if len_data:
+                if self._truncate_str_data and len_data > self._STR_MAX_LEN_DATA:
+                    data = data[:self._STR_MAX_LEN_DATA]
+                    postfix = "...[truncated %s bytes]" % (len_data - self._STR_MAX_LEN_DATA)
+                else:
+                    postfix = ""
+                data = "0x%s" % binascii.hexlify(data).decode()
+                out = "%s\n%s%s%s" % (out, self._STR_INDENT, data, postfix)
+
+            out = "%s\n</%s>" % (out, self.tag)
+        else:
+            out = "%s />" % out
+
+        return out
 
     def getData(self):
         return self.data
 
     def setData(self, data):
         self.data = data
-        
-    
-    @staticmethod   
+
+
+    @staticmethod
     def tagEquals(node,string):
         return node is not None and node.tag is not None and node.tag == string
-        
-        
+
+
     @staticmethod
     def require(node,string):
         if not ProtocolTreeNode.tagEquals(node,string):
             raise Exception("failed require. string: "+string);
-    
+
 
     def __getitem__(self, key):
         return self.getAttributeValue(key)
@@ -131,7 +134,7 @@ class ProtocolTreeNode(object):
     def addChildren(self, children):
         for c in children:
             self.addChild(c)
-        
+
     def getAttributeValue(self,string):
         try:
             return self.attributes[string]
@@ -149,7 +152,7 @@ class ProtocolTreeNode(object):
         ret = []
         if tag is None:
             return self.children
-        
+
         for c in self.children:
             if tag == c.tag:
                 ret.append(c)

@@ -1,14 +1,17 @@
-from yowsup.layers import YowLayer, YowLayerEvent, YowProtocolLayer
-from .keystream import KeyStream
-from yowsup.common.tools import TimeTools
-from .layer_crypt import YowCryptLayer
+from yowsup.common import YowConstants
+from yowsup.layers import YowLayerEvent, YowProtocolLayer, EventCallback
 from yowsup.layers.network import YowNetworkLayer
-from .autherror import AuthError
 from .protocolentities import *
-import base64
+from .layer_interface_authentication import YowAuthenticationProtocolLayerInterface
+from .protocolentities import StreamErrorProtocolEntity
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class YowAuthenticationProtocolLayer(YowProtocolLayer):
-    EVENT_LOGIN      = "org.openwhatsapp.yowsup.event.auth.login"
     EVENT_AUTHED  = "org.openwhatsapp.yowsup.event.auth.authed"
+    EVENT_AUTH = "org.openwhatsapp.yowsup.event.auth"
     PROP_CREDENTIALS = "org.openwhatsapp.yowsup.prop.auth.credentials"
     PROP_PASSIVE = "org.openwhatsapp.yowsup.prop.auth.passive"
 
@@ -17,36 +20,33 @@ class YowAuthenticationProtocolLayer(YowProtocolLayer):
             "stream:features": (self.handleStreamFeatures, None),
             "failure": (self.handleFailure, None),
             "success": (self.handleSuccess, None),
-            "challenge": (self.handleChallenge, None)
+            "stream:error": (self.handleStreamError, None),
         }
         super(YowAuthenticationProtocolLayer, self).__init__(handleMap)
-        self.credentials = None
+        self.interface = YowAuthenticationProtocolLayerInterface(self)
 
     def __str__(self):
         return "Authentication Layer"
 
-    def __getCredentials(self):
-        u, pb64 = self.getProp(YowAuthenticationProtocolLayer.PROP_CREDENTIALS)
-        password = base64.b64decode(pb64)
-        return (u, bytearray(password))
+    @EventCallback(YowNetworkLayer.EVENT_STATE_CONNECTED)
+    def on_connected(self, event):
+        self.broadcastEvent(
+            YowLayerEvent(
+                self.EVENT_AUTH,
+                passive=self.getProp(self.PROP_PASSIVE, False)
+            )
+        )
 
-    def onEvent(self, event):
-        if event.getName() == YowNetworkLayer.EVENT_STATE_CONNECTED:
-            self.login()
-        elif event.getName() == YowNetworkLayer.EVENT_STATE_CONNECT:
-            self.credentials = self.__getCredentials()
-            if not self.credentials:
-                raise AuthError("Auth stopped connection signal as no credentials have been set")
+    def setCredentials(self, credentials):
+        logger.warning("setCredentials is deprecated and has no effect, user stack.setProfile instead")
 
-    ## general methods
-    def login(self):
-        
-        self._sendFeatures()
-        self._sendAuth()
+    def getUsername(self, full = False):
+        username = self.getProp("profile").username
+        return username if not full else ("%s@%s" % (username, YowConstants.WHATSAPP_SERVER))
 
-    ###recieved node handlers handlers
     def handleStreamFeatures(self, node):
         nodeEntity = StreamFeaturesProtocolEntity.fromProtocolTreeNode(node)
+        self.toUpper(nodeEntity)
 
     def handleSuccess(self, node):
         successEvent = YowLayerEvent(self.__class__.EVENT_AUTHED, passive = self.getProp(self.__class__.PROP_PASSIVE))
@@ -58,53 +58,12 @@ class YowAuthenticationProtocolLayer(YowProtocolLayer):
         nodeEntity = FailureProtocolEntity.fromProtocolTreeNode(node)
         self.toUpper(nodeEntity)
         self.broadcastEvent(YowLayerEvent(YowNetworkLayer.EVENT_STATE_DISCONNECT, reason = "Authentication Failure"))
-        raise AuthError(nodeEntity.getReason())
 
-    def handleChallenge(self, node):
-        nodeEntity = ChallengeProtocolEntity.fromProtocolTreeNode(node)
-        self._sendResponse(nodeEntity.getNonce())
+    def handleStreamError(self, node):
+        nodeEntity = StreamErrorProtocolEntity.fromProtocolTreeNode(node)
+        errorType = nodeEntity.getErrorType()
 
-    ##senders
-    def _sendFeatures(self):
-        self.entityToLower(StreamFeaturesProtocolEntity(["readreceipts", "groups_v2", "privacy", "presence"]))
+        if not errorType:
+            raise NotImplementedError("Unhandled stream:error node:\n%s" % node)
 
-    def _sendAuth(self):
-        passive = self.getProp(self.__class__.PROP_PASSIVE, False)
-        self.entityToLower(AuthProtocolEntity(self.credentials[0], passive=passive))
-
-    def _sendResponse(self,nonce):
-        keys = KeyStream.generateKeys(self.credentials[1], nonce)
-
-        inputKey = KeyStream(keys[2], keys[3])
-        outputKey = KeyStream(keys[0], keys[1])
-
-        #YowCryptLayer.setProp("inputKey", inputKey)
-
-
-        nums = bytearray(4)
-
-        #nums = [0] * 4
-
-
-        username_bytes = list(map(ord, self.credentials[0]))
-        nums.extend(username_bytes)
-        nums.extend(nonce)
-
-        utcNow = str(int(TimeTools.utcTimestamp()))
-
-        time_bytes =  list(map(ord, utcNow))
-
-        nums.extend(time_bytes)
-
-        encoded = outputKey.encodeMessage(nums, 0, 4, len(nums) - 4)
-        authBlob = "".join(map(chr, encoded))
-
-        responseEntity = ResponseProtocolEntity(authBlob)
-
-        #to prevent enr whole response
-        self.broadcastEvent(YowLayerEvent(YowCryptLayer.EVENT_KEYS_READY, keys = (inputKey, None))) 
-        self.entityToLower(responseEntity)
-        self.broadcastEvent(YowLayerEvent(YowCryptLayer.EVENT_KEYS_READY, keys = (inputKey, outputKey)))
-        #YowCryptLayer.setProp("outputKey", outputKey)
-
-
+        self.toUpper(nodeEntity)

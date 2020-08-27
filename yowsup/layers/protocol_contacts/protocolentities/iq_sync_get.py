@@ -17,7 +17,7 @@ class GetSyncIqProtocolEntity(SyncIqProtocolEntity):
     <iq type="get" id="{{id}}" xmlns="urn:xmpp:whatsapp:sync">
         <sync mode="{{full | ?}}"
             context="{{registration | ?}}"
-            sid="{{str((time.time() + 11644477200) * 10000000)}}"
+            sid="{{str((int(time.time()) + 11644477200) * 10000000)}}"
             index="{{0 | ?}}"
             last="{{true | false?}}"
         >
@@ -53,8 +53,8 @@ class GetSyncIqProtocolEntity(SyncIqProtocolEntity):
         return out
 
     def toProtocolTreeNode(self):
-        
-        users = [ProtocolTreeNode("user", {}, None, number) for number in self.numbers]
+
+        users = [ProtocolTreeNode("user", {}, None, number.encode()) for number in self.numbers]
 
         node = super(GetSyncIqProtocolEntity, self).toProtocolTreeNode()
         syncNode = node.getChild("sync")
@@ -68,7 +68,7 @@ class GetSyncIqProtocolEntity(SyncIqProtocolEntity):
     def fromProtocolTreeNode(node):
         syncNode         = node.getChild("sync")
         userNodes        = syncNode.getAllChildren()
-        numbers          = [userNode.data for userNode in userNodes]
+        numbers          = [userNode.data.decode() for userNode in userNodes]
         entity           = SyncIqProtocolEntity.fromProtocolTreeNode(node)
         entity.__class__ = GetSyncIqProtocolEntity
 
@@ -76,5 +76,5 @@ class GetSyncIqProtocolEntity(SyncIqProtocolEntity):
             syncNode.getAttributeValue("mode"),
             syncNode.getAttributeValue("context"),
             )
-   
+
         return entity

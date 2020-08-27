@@ -1,8 +1,9 @@
+from yowsup.common import YowConstants
 from yowsup.layers.protocol_iq.protocolentities import ResultIqProtocolEntity
 from yowsup.structs import ProtocolTreeNode
 class ResultRequestUploadIqProtocolEntity(ResultIqProtocolEntity):
     def __init__(self, _id, url, ip = None, resumeOffset = 0, duplicate = False):
-        super(ResultRequestUploadIqProtocolEntity, self).__init__(_id = _id, _from = "s.whatsapp.net")
+        super(ResultRequestUploadIqProtocolEntity, self).__init__(_id = _id, _from = YowConstants.WHATSAPP_SERVER)
         self.setUploadProps(url, ip, resumeOffset, duplicate)
 
     def setUploadProps(self, url ,ip = None, resumeOffset = 0, duplicate = False):
@@ -34,7 +35,7 @@ class ResultRequestUploadIqProtocolEntity(ResultIqProtocolEntity):
         node = super(ResultRequestUploadIqProtocolEntity, self).toProtocolTreeNode()
 
         if not self.isDuplicate():
-            mediaNode = ProtocolTreeNode("media", {"url": self.url})
+            mediaNode = ProtocolTreeNode("encr_media", {"url": self.url})
             if self.ip:
                 mediaNode["ip"] = self.ip
 
@@ -50,7 +51,7 @@ class ResultRequestUploadIqProtocolEntity(ResultIqProtocolEntity):
     def fromProtocolTreeNode(node):
         entity= ResultIqProtocolEntity.fromProtocolTreeNode(node)
         entity.__class__ = ResultRequestUploadIqProtocolEntity
-        mediaNode = node.getChild("media")
+        mediaNode = node.getChild("encr_media")
         if mediaNode:
             entity.setUploadProps(mediaNode["url"], mediaNode["ip"], mediaNode["resume"])
         else:

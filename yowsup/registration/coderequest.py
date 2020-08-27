@@ -1,56 +1,48 @@
 from yowsup.common.http.warequest import WARequest
 from yowsup.common.http.waresponseparser import JSONResponseParser
-# from yowsup.env import CURRENT_ENV
-from yowsup.common.tools import StorageTools, WATools
+from yowsup.common.tools import WATools
 from yowsup.registration.existsrequest import WAExistsRequest
-from yowsup.env import S40YowsupEnv
-CURRENT_ENV = S40YowsupEnv()
+from yowsup.env import YowsupEnv
+
 
 class WACodeRequest(WARequest):
+    def __init__(self, method, config):
+        """
+        :type method: str
+        :param config:
+        :type config: yowsup.config.v1.config.Config
+        """
+        super(WACodeRequest,self).__init__(config)
 
-    def __init__(self,cc, p_in, mcc= "000", mnc = "000", sim_mcc = "000", sim_mnc = "000", method="sms"):
-        super(WACodeRequest,self).__init__()
-        idx = StorageTools.getIdentity(cc + p_in)
-
-        self.p_in = p_in
-        self.__id = idx
-        self.cc = cc
-
-        self.addParam("cc", cc)
-        self.addParam("in", p_in)
-        self.addParam("lc", "GB")
-        self.addParam("lg", "en")
-        self.addParam("mcc", "000")
-        self.addParam("mnc", "000")
-        self.addParam("sim_mcc", sim_mcc.zfill(3))
-        self.addParam("sim_mnc", sim_mnc.zfill(3))
+        self.addParam("mcc", config.mcc.zfill(3))
+        self.addParam("mnc", config.mnc.zfill(3))
+        self.addParam("sim_mcc", config.sim_mcc.zfill(3))
+        self.addParam("sim_mnc", config.sim_mnc.zfill(3))
         self.addParam("method", method)
-        #self.addParam("id", idx)
-        self.addParam("network_radio_type", "1")
-        self.addParam("reason", "self-send-jailbroken")
-
-
-        self.addParam("token", CURRENT_ENV.getToken(p_in))
+        self.addParam("reason", "")
+        self.addParam("token", YowsupEnv.getCurrent().getToken(self._p_in))
+        self.addParam("hasav", "1")
 
         self.url = "v.whatsapp.net/v2/code"
 
         self.pvars = ["status","reason","length", "method", "retry_after", "code", "param"] +\
-                    ["login", "pw", "type", "expiration", "kind", "price", "cost", "currency", "price_expiration"]
-
+                    ["login", "type", "sms_wait", "voice_wait"]
         self.setParser(JSONResponseParser())
 
-    def send(self, parser = None):
-        if self.__id is not None:
-            request = WAExistsRequest(self.cc, self.p_in, self.__id)
-            result = request.send()
-            if result["status"] == "ok":
-                return result
+    def send(self, parser = None, encrypt=True, preview=False):
+        if self._config.id is not None:
+            request = WAExistsRequest(self._config)
+            result = request.send(encrypt=encrypt, preview=preview)
 
-        self.__id = WATools.generateIdentity()
-        self.addParam("id", self.__id)
+            if result:
+                if result["status"] == "ok":
+                    return result
+                elif result["status"] == "fail" and "reason" in result and result["reason"] == "blocked":
+                    return result
+        else:
+            self._config.id = WATools.generateIdentity()
+            self.addParam("id", self._config.id)
 
-        res = super(WACodeRequest, self).send(parser)
-        if res["status"] == "sent":
-            StorageTools.writeIdentity(self.cc + self.p_in, self.__id)
+        res = super(WACodeRequest, self).send(parser, encrypt=encrypt, preview=preview)
+
         return res
-

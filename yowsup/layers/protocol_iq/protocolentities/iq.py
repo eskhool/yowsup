@@ -32,8 +32,8 @@ class IqProtocolEntity(ProtocolEntity):
     def getXmlns(self):
         return self.xmlns
 
-    def getFrom(self):
-        return self._from
+    def getFrom(self, full = True):
+        return self._from if full else self._from.split('@')[0]
 
     def getTo(self):
         return self.to
@@ -49,7 +49,7 @@ class IqProtocolEntity(ProtocolEntity):
 
         if self.to:
             attribs["to"] = self.to
-        elif self.to:
+        elif self._from:
             attribs["from"] = self._from
 
         return self._createProtocolTreeNode(attribs, None, data = None)

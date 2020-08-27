@@ -1,9 +1,14 @@
-from yowsup.structs import ProtocolEntity, ProtocolTreeNode
 from yowsup.layers.protocol_iq.protocolentities import IqProtocolEntity
 class PictureIqProtocolEntity(IqProtocolEntity):
     '''
-    <iq type="{{get | set?}}" id="{{id}}" xmlns="w:profile:picture", to={{group_jid}}">
+    When receiving a profile picture:
+    <iq type="result" from="{{jid}}" id="{{id}}">
+        <picture type="image" id="{{another_id}}">
+        {{Binary bytes of the picture.}}
+        </picture>
     </iq>
     '''
-    def __init__(self, to = None,  _id = None, _type = None):
-        super(PictureIqProtocolEntity, self).__init__("w:profile:picture", _id, _type, to = to)
+    XMLNS = "w:profile:picture"
+
+    def __init__(self, jid, _id = None, type = "get"):
+        super(PictureIqProtocolEntity, self).__init__(self.__class__.XMLNS, _id = _id, _type=type, to = jid)

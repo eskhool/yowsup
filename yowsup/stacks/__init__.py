@@ -1,11 +1,10 @@
-from .yowstack import YowStack
+from .yowstack import YowStack, YowStackBuilder
 
-from yowsup.layers.auth                        import YowCryptLayer, YowAuthenticationProtocolLayer, AuthError
+from yowsup.layers.auth                        import YowAuthenticationProtocolLayer
 from yowsup.layers.coder                       import YowCoderLayer
 from yowsup.layers.logger                      import YowLoggerLayer
 from yowsup.layers.network                     import YowNetworkLayer
 from yowsup.layers.protocol_messages           import YowMessagesProtocolLayer
-from yowsup.layers.stanzaregulator             import YowStanzaRegulator
 from yowsup.layers.protocol_media              import YowMediaProtocolLayer
 from yowsup.layers.protocol_acks               import YowAckProtocolLayer
 from yowsup.layers.protocol_receipts           import YowReceiptProtocolLayer
@@ -17,13 +16,18 @@ from yowsup.layers.protocol_iq                 import YowIqProtocolLayer
 from yowsup.layers.protocol_contacts           import YowContactsIqProtocolLayer
 from yowsup.layers.protocol_chatstate          import YowChatstateProtocolLayer
 from yowsup.layers.protocol_privacy            import YowPrivacyProtocolLayer
+from yowsup.layers.protocol_profiles           import YowProfilesProtocolLayer
+from yowsup.layers.protocol_calls              import YowCallsProtocolLayer
+from yowsup.layers.noise.layer                 import YowNoiseLayer
+from yowsup.layers.noise.layer_noise_segments  import YowNoiseSegmentsLayer
+
 
 
 YOWSUP_CORE_LAYERS = (
     YowLoggerLayer,
     YowCoderLayer,
-    YowCryptLayer,
-    YowStanzaRegulator,
+    YowNoiseLayer,
+    YowNoiseSegmentsLayer,
     YowNetworkLayer
 )
 
@@ -38,7 +42,9 @@ YOWSUP_PROTOCOL_LAYERS_BASIC = (
 
 YOWSUP_PROTOCOL_LAYERS_GROUPS = (YowGroupsProtocolLayer,) + YOWSUP_PROTOCOL_LAYERS_BASIC
 YOWSUP_PROTOCOL_LAYERS_MEDIA  = (YowMediaProtocolLayer,) + YOWSUP_PROTOCOL_LAYERS_BASIC
-YOWSUP_PROTOCOL_LAYERS_FULL = (YowGroupsProtocolLayer, YowMediaProtocolLayer, YowPrivacyProtocolLayer)\
+YOWSUP_PROTOCOL_LAYERS_PROFILES  = (YowProfilesProtocolLayer,) + YOWSUP_PROTOCOL_LAYERS_BASIC
+YOWSUP_PROTOCOL_LAYERS_CALLS  = (YowCallsProtocolLayer,) + YOWSUP_PROTOCOL_LAYERS_BASIC
+YOWSUP_PROTOCOL_LAYERS_FULL = (YowGroupsProtocolLayer, YowMediaProtocolLayer, YowPrivacyProtocolLayer, YowProfilesProtocolLayer, YowCallsProtocolLayer)\
                               + YOWSUP_PROTOCOL_LAYERS_BASIC
 
 
